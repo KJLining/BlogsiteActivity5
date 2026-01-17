@@ -5,7 +5,9 @@ import {
   Get,
   Param,
   Post as HttpPost,
+  Put,
   Query,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -61,18 +63,9 @@ export class CommentsController {
       type: 'object',
       required: ['postId', 'author', 'content'],
       properties: {
-        postId: {
-          type: 'number',
-          example: 1,
-        },
-        author: {
-          type: 'string',
-          example: 'john_doe',
-        },
-        content: {
-          type: 'string',
-          example: 'This is a comment',
-        },
+        postId: { type: 'number', example: 1 },
+        author: { type: 'string', example: 'john_doe' },
+        content: { type: 'string', example: 'This is a comment' },
       },
     },
   })
@@ -98,7 +91,48 @@ export class CommentsController {
   }
 
   // =========================
-  // DELETE COMMENT (OWNER ONLY)
+  // UPDATE COMMENT (AUTHOR ONLY)
+  // =========================
+  @Put(':id')
+  @ApiOperation({ summary: 'Update a comment (author only)' })
+  @ApiParam({
+    name: 'id',
+    type: Number,
+    example: 5,
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['author', 'content'],
+      properties: {
+        author: { type: 'string', example: 'john_doe' },
+        content: { type: 'string', example: 'Updated comment content' },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Comment updated successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Comment not found' })
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { author: string; content: string },
+  ) {
+    const comment = await this.commentRepo.findOneBy({ id });
+
+    if (!comment) {
+      return { message: 'Comment not found' };
+    }
+
+    if (comment.author !== body.author) {
+      return { message: 'Unauthorized' };
+    }
+
+    comment.content = body.content;
+    return this.commentRepo.save(comment);
+  }
+
+  // =========================
+  // DELETE COMMENT (AUTHOR ONLY)
   // =========================
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a comment (author only)' })
@@ -112,10 +146,7 @@ export class CommentsController {
       type: 'object',
       required: ['author'],
       properties: {
-        author: {
-          type: 'string',
-          example: 'john_doe',
-        },
+        author: { type: 'string', example: 'john_doe' },
       },
     },
   })
@@ -127,7 +158,10 @@ export class CommentsController {
     status: 401,
     description: 'Unauthorized',
   })
-  async remove(@Param('id') id: number, @Body() body: { author: string }) {
+  async remove(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { author: string },
+  ) {
     const comment = await this.commentRepo.findOneBy({ id });
 
     if (!comment) {

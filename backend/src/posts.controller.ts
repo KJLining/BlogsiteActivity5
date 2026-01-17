@@ -6,6 +6,7 @@ import {
   Param,
   Post as HttpPost,
   Put,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -26,10 +27,11 @@ export class PostsController {
     private postRepo: Repository<Post>,
   ) {}
 
-  // ✅ GET ALL POSTS
+  // =========================
+  // GET ALL POSTS
+  // =========================
   @Get()
   @ApiOperation({ summary: 'Get all blog posts' })
-  @ApiResponse({ status: 200, description: 'List of posts' })
   async findAll() {
     const posts = await this.postRepo.find({
       order: { date: 'DESC' },
@@ -45,15 +47,14 @@ export class PostsController {
     }));
   }
 
-  // ✅ GET SINGLE POST
+  // =========================
+  // GET SINGLE POST
+  // =========================
   @Get(':id')
   @ApiOperation({ summary: 'Get a single post by ID' })
   @ApiParam({ name: 'id', type: Number })
-  @ApiResponse({ status: 200, description: 'Post found' })
-  @ApiResponse({ status: 404, description: 'Post not found' })
-  async findOne(@Param('id') id: number) {
+  async findOne(@Param('id', ParseIntPipe) id: number) {
     const post = await this.postRepo.findOneBy({ id });
-
     if (!post) return null;
 
     return {
@@ -62,25 +63,22 @@ export class PostsController {
     };
   }
 
-  // ✅ CREATE POST
+  // =========================
+  // CREATE POST
+  // =========================
   @HttpPost()
   @ApiOperation({ summary: 'Create a new post' })
   @ApiBody({
     schema: {
-      type: 'object',
       required: ['title', 'excerpt', 'author'],
       properties: {
-        title: { type: 'string', example: 'My First Blog' },
-        excerpt: { type: 'string', example: 'This is a short description' },
-        image: {
-          type: 'string',
-          example: 'https://picsum.photos/600/300',
-        },
-        author: { type: 'string', example: 'john_doe' },
+        title: { type: 'string' },
+        excerpt: { type: 'string' },
+        image: { type: 'string' },
+        author: { type: 'string' },
       },
     },
   })
-  @ApiResponse({ status: 201, description: 'Post created successfully' })
   async create(
     @Body()
     body: {
@@ -106,26 +104,13 @@ export class PostsController {
     };
   }
 
-  // ✅ UPDATE POST (OWNER ONLY)
+  // =========================
+  // UPDATE POST (AUTHOR ONLY)
+  // =========================
   @Put(':id')
   @ApiOperation({ summary: 'Update a post (author only)' })
-  @ApiParam({ name: 'id', type: Number })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      required: ['title', 'excerpt', 'image', 'author'],
-      properties: {
-        title: { type: 'string', example: 'Updated title' },
-        excerpt: { type: 'string', example: 'Updated excerpt' },
-        image: { type: 'string', example: 'https://picsum.photos/600/300' },
-        author: { type: 'string', example: 'john_doe' },
-      },
-    },
-  })
-  @ApiResponse({ status: 200, description: 'Post updated successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
   async update(
-    @Param('id') id: number,
+    @Param('id', ParseIntPipe) id: number,
     @Body()
     body: {
       title: string;
@@ -151,18 +136,27 @@ export class PostsController {
     };
   }
 
-  // ✅ DELETE POST (OWNER ONLY)
-  @Delete(':id/:author')
+  // =========================
+  // DELETE POST (AUTHOR ONLY)
+  // =========================
+  @Delete(':id')
   @ApiOperation({ summary: 'Delete a post (author only)' })
-  @ApiParam({ name: 'id', type: Number })
-  @ApiParam({ name: 'author', type: String })
-  @ApiResponse({ status: 200, description: 'Post deleted' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async remove(@Param('id') id: number, @Param('author') author: string) {
+  @ApiBody({
+    schema: {
+      required: ['author'],
+      properties: {
+        author: { type: 'string', example: 'john_doe' },
+      },
+    },
+  })
+  async remove(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { author: string },
+  ) {
     const post = await this.postRepo.findOneBy({ id });
 
     if (!post) return { message: 'Post not found' };
-    if (post.author !== author) return { message: 'Unauthorized' };
+    if (post.author !== body.author) return { message: 'Unauthorized' };
 
     await this.postRepo.remove(post);
     return { message: 'Post deleted' };
